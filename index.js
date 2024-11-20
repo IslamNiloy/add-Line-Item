@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json()); 
 const PORT = 3000;
 const hubspotRoutes = require('./routes/hubspotRoutes');
-const workflowRoutes = require('./routes/workflowRoutes');
+// const workflowRoutes = require('./routes/workflowRoutes');
 const lineItemRoutes = require('./routes/lineItemRoutes');
 
 
@@ -37,7 +37,7 @@ mongoose.connect(mongoUri)
 
 // Routes
 app.use('/', hubspotRoutes);
-app.use('/', workflowRoutes);
+// app.use('/', workflowRoutes);
 app.use('/', lineItemRoutes);
 
 // Start server

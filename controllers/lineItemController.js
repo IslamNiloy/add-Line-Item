@@ -5,6 +5,7 @@ const axios = require('axios');
 
 
 exports.associateToDeal = async(req,res) =>{
+    console.log('Associations: ', req.body)
     const {portalId } = req.body; // Retrieve portalId from session
     if (!portalId) {
       return res.status(400).json({ error: 'Portal ID not found in session' });
@@ -44,6 +45,7 @@ exports.associateToDeal = async(req,res) =>{
 
 
 exports.fetchAllProductsNew = async (req, res) => {
+    console.log("Fetch All Product : ",req.body);
     // Handle CORS headers
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');

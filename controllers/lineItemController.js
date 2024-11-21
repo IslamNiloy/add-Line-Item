@@ -107,3 +107,53 @@ exports.fetchAllProductsNew = async (req, res) => {
         });
     }
 };
+
+
+exports.fetchProductPrice = async (req, res) => {
+    console.log("Fetch Product Price: ", req.body);
+
+    // Handle CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+
+    // Retrieve the query parameters
+    const { productId, portalId } = req.body;
+
+    if (!productId) {
+        return res.status(400).json({ error: 'Product ID is required' });
+    }
+
+    if (!portalId) {
+        return res.status(400).json({ error: 'Portal ID is required' });
+    }
+
+    // Retrieve the OAuth token for the portalId
+    const accessToken = await getAccessToken(portalId);
+    if (!accessToken) {
+        return res.status(403).json({ error: 'Access token not found for the portal' });
+    }
+
+    const hubspotClient = new hubspot.Client();
+    hubspotClient.setAccessToken(accessToken);
+
+    try {
+        // Fetch the product details from HubSpot
+        const product = await hubspotClient.crm.products.basicApi.getById(productId);
+
+        if (!product || !product.properties) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Extract the unit price
+        const unitPrice = product.properties.price;
+
+        // Respond with the unit price
+        res.status(200).json({
+            productId: productId,
+            unitPrice: unitPrice || 0 // Return 0 if the price is not available
+        });
+    } catch (error) {
+        console.error('Error fetching product price:', error.message || error);
+        res.status(500).json({ error: 'An error occurred while fetching the product price' });
+    }
+};

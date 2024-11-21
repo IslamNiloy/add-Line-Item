@@ -4,7 +4,7 @@ const { associateToDeal,fetchAllProductsNew, fetchProductPrice} = require('../co
 
 router.post('/association', associateToDeal);
 router.post('/get-product',fetchAllProductsNew);
-router.get('/get-product-price', fetchProductPrice);
+router.post('/get-product-price', fetchProductPrice);
 
 
 

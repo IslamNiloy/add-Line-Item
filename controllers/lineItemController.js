@@ -4,28 +4,106 @@ const { getAccessToken } = require('./hubspotController');  // Import the token 
 const axios = require('axios');
 
 
-exports.associateToDeal = async(req,res) =>{
-    console.log('Associations: ', req.body)
-    const {portalId } = req.body; // Retrieve portalId from session
+exports.associateToDeal = async (req, res) => {
+    console.log('Associations: ', req.body);
+
+    // Extract portalId from the request body
+    const portalId = req.body.origin?.portalId;
     if (!portalId) {
-      return res.status(400).json({ error: 'Portal ID not found in session' });
+        return res.status(400).json({ error: 'Portal ID not found in request body' });
     }
+
     // Retrieve the OAuth token for the portalId
     const accessToken = await getAccessToken(portalId);
-    // console.log('Access Token:', accessToken);
     const hubspotClient = new hubspot.Client();
     hubspotClient.setAccessToken(accessToken);
-    const dealId = req.body.dealId;
-    const selectedProduct = req.body.productId;
-    const quantity = req.body.quantity;
 
+    // Extract dealId from the request body
+    const dealId = req.body.object?.objectId;
+    if (!dealId) {
+        return res.status(400).json({ error: 'Deal ID not found in request body' });
+    }
+
+    // Extract fields from the request body
+    const fields = req.body.fields || req.body.inputFields;
+    const selectedProduct = fields.productSelect;
+    const unitPriceOption = fields.unitPrice;
+    const customUnitPrice = fields.customUnitPrice;
+    const quantity = parseInt(fields.quantity) || 1;
+    const discountType = fields.discountType;
+    const discountPercentage = parseFloat(fields.discountPercentage) || 0;
+    const discountPrice = parseFloat(fields.discountPrice) || 0;
+    const updateDealAmount = fields.updateDealAmount;
+
+    // Determine the unit price
+    let unitPrice = 0;
+    if (unitPriceOption === 'custom') {
+        unitPrice = parseFloat(customUnitPrice) || 0;
+    } else {
+        unitPrice = parseFloat(unitPriceOption) || 0;
+    }
+
+    // Calculate the discount
+    let discountAmount = 0;
+    if (discountType === 'percentage' && discountPercentage > 0) {
+        discountAmount = (unitPrice * discountPercentage) / 100;
+    } else if (discountType === 'price' && discountPrice > 0) {
+        discountAmount = discountPrice;
+    }
+
+    // Prepare properties for the line item
     const properties = {
-    "hs_product_id": selectedProduct,
-    "quantity": quantity
+        "hs_product_id": selectedProduct,
+        "quantity": quantity,
+        "price": unitPrice,
+        "discount":discountAmount
     };
-    const SimplePublicObjectInputForCreate = { associations: [{"types":[{"associationCategory":"HUBSPOT_DEFINED","associationTypeId":20}],"to":{"id":dealId}}], objectWriteTraceId: "string", properties };
+
+    if (discountType === 'percentage' && discountPercentage > 0) {
+        properties.discount_percentage = discountPercentage.toFixed(2);
+    } else if (discountType === 'price' && discountPrice > 0) {
+        properties.discount_amount = discountPrice.toFixed(2);
+    }
+
+    // Prepare the line item input with associations
+    const lineItemInput = {
+        properties,
+        associations: [
+            {
+                to: { id: dealId },
+                types: [
+                    {
+                        associationCategory: "HUBSPOT_DEFINED",
+                        associationTypeId: 20 // Line item to deal association type
+                    }
+                ]
+            }
+        ]
+    };
+
     try {
-        await hubspotClient.crm.lineItems.basicApi.create(SimplePublicObjectInputForCreate);
+        // Create the line item and associate it with the deal
+        await hubspotClient.crm.lineItems.basicApi.create(lineItemInput);
+
+        // Update the deal amount if specified
+        if (updateDealAmount === 'yes') {
+            // Fetch the current deal amount
+            const dealResponse = await hubspotClient.crm.deals.basicApi.getById(dealId, ['amount']);
+            console.log(dealResponse)
+            const currentDealAmount = parseFloat(dealResponse.properties.amount) || 0;
+
+            // Calculate the total for the line item
+            const lineItemTotal = (unitPrice - discountAmount) * quantity;
+
+            // Update the deal amount
+            const updatedAmount = currentDealAmount + lineItemTotal;
+            await hubspotClient.crm.deals.basicApi.update(dealId, {
+                properties: {
+                    amount: updatedAmount.toFixed(2)
+                }
+            });
+        }
+
         res.status(200).json({
             "outputFields": {
                 "message": "Success",
@@ -33,14 +111,15 @@ exports.associateToDeal = async(req,res) =>{
             }
         });
     } catch (e) {
-      console.error(e.message === 'HTTP request failed' ? JSON.stringify(e.response, null, 2) : e);
-      res.status(500).json({
-        "outputFields": {
-          "hs_execution_state": "An error occurred while removing the association."
-        }
-     });
+        console.error(e.message === 'HTTP request failed' ? JSON.stringify(e.response, null, 2) : e);
+        res.status(500).json({
+            "outputFields": {
+                "hs_execution_state": "An error occurred while creating the line item or updating the deal amount."
+            }
+        });
     }
-}
+};
+
 
 
 
@@ -151,7 +230,7 @@ exports.fetchProductPrice = async (req, res) => {
 
             // Add the fetched product price to the options
             options.push({
-                label: `Unit Price: $${unitPrice}`,
+                label: unitPrice,
                 value: unitPrice.toString()
             });
         }

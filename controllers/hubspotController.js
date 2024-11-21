@@ -77,7 +77,7 @@ const getPortalIdFromAccessToken = async (accessToken) => {
       url: `https://api.hubapi.com/oauth/v1/access-tokens/${accessToken}`,
       json: true
     });
-    console.log(`Response in getPortalIdFromAccessToken: ${JSON.stringify(response)}`)
+    // console.log(`Response in getPortalIdFromAccessToken: ${JSON.stringify(response)}`)
     this.insertIntoUser(response);
     return response.hub_id;  // This will give you the portalId (HubSpot account ID)
   } catch (e) {

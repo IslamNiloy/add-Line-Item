@@ -79,6 +79,7 @@ exports.fetchAllProductsNew = async (req, res) => {
                 "label": product.properties.name,
                 "description": product.properties.name,
                 "value": product.id,
+                "unitPrice":product.properties.price
             }));
 
             allProducts = allProducts.concat(productList);
